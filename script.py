@@ -6,7 +6,7 @@ import torch
 import edge_tts
 import asyncio
 
-from modules import chat, shared
+from modules import chat, shared, ui_chat
 from modules.utils import gradio
 
 torch._C._jit_set_profiling_mode(False)
@@ -123,9 +123,9 @@ def ui():
         show_text.change(
             lambda x: params.update({"show_text": x}), show_text, None).then(
             toggle_text_in_history, gradio('history'), gradio('history')).then(
-            chat.save_persistent_history, gradio('history', 'character_menu', 'mode'), None).then(
-            chat.redraw_html, shared.reload_inputs, gradio('display'))
-        
+            chat.save_history, gradio('history', 'unique_id', 'character_menu', 'mode'), None).then(
+            chat.redraw_html, gradio(ui_chat.reload_arr), gradio('display'))
+            
     # Event functions to update the parameters in the backend
     activate.change(lambda x: params.update({"activate": x}), activate, None)
     autoplay.change(lambda x: params.update({"autoplay": x}), autoplay, None)
