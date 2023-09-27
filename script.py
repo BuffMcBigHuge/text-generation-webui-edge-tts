@@ -6,7 +6,7 @@ import torch
 import edge_tts
 import asyncio
 
-from modules import chat, shared, ui_chat
+from modules import chat, shared, ui_chat, tts_preprocessor
 from modules.utils import gradio
 
 torch._C._jit_set_profiling_mode(False)
@@ -15,7 +15,6 @@ params = {
     'activate': True,
     'speaker': 'en-US-MichelleNeural',
     'language': 'en',
-    'device': 'cpu',
     'show_text': False,
     'autoplay': True
 }
@@ -74,6 +73,11 @@ def output_modifier(string, state):
         return string
 
     original_string = string
+
+    original_string = string
+    string = tts_preprocessor.replace_invalid_chars(html.unescape(string))
+    string = tts_preprocessor.replace_abbreviations(string)
+    string = tts_preprocessor.clean_whitespace(string)
 
     if string == '':
         string = '*Empty reply, try regenerating*'
