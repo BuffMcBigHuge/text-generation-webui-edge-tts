@@ -16,13 +16,14 @@ import asyncio
 from scipy.io import wavfile
 import numpy as np
 
-from modules import chat, shared, ui_chat, tts_preprocessor
+from modules import chat, shared, ui_chat
 from modules.utils import gradio
 
 from fairseq import checkpoint_utils
 
 sys.path.append("extensions/edge_tts")
 
+import tts_preprocessor
 from rmvpe import RMVPE
 from vc_infer_pipeline import VC
 from lib.infer_pack.models import (
