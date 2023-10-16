@@ -141,7 +141,7 @@ def output_modifier(string, state):
     if params['speaker'] is None:
         return logger.error('No speaker selected')
     
-    if params['rvc'] and params['rvc_model'] is None:
+    if params['rvc'] is True and params['rvc_model'] is None:
         return logger.error('No RVC model selected')
 
     original_string = string
@@ -160,7 +160,7 @@ def output_modifier(string, state):
         # print(f'{string}')
 
         communicate = edge_tts.Communicate(string, params['speaker'])
-        # asyncio.run(communicate.save(output_file))
+        asyncio.run(communicate.save(output_file))
 
         if (params['rvc'] is True):
             print('Running RVC')
@@ -187,7 +187,7 @@ def voice_preview(preview_text):
     if params['speaker'] is None:
         return logger.error('No speaker selected')
     
-    if params['rvc'] and params['rvc_model'] is None:
+    if params['rvc'] is True and params['rvc_model'] is None:
         return logger.error('No RVC model selected')
 
     string = preview_text or random_sentence()
