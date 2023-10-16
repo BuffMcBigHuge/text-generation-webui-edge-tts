@@ -15,9 +15,11 @@ import edge_tts
 import asyncio
 from scipy.io import wavfile
 import numpy as np
+from threading import Thread
 
 from modules import chat, shared, ui_chat
 from modules.utils import gradio
+from modules.logging_colors import logger
 
 from fairseq import checkpoint_utils
 
@@ -38,11 +40,11 @@ torch._C._jit_set_profiling_mode(False)
 
 params = {
     'activate': True,
-    'speaker': 'en-US-MichelleNeural',
+    'speaker': None,
     'language': 'en',
     'show_text': False,
-    'autoplay': True,
-    'rvc': True,
+    'autoplay': False,
+    'rvc': False,
     'rvc_model': None,
     'transpose': 2,
     'index_rate': 1,
@@ -55,7 +57,6 @@ rvc_models = []
 rvc_config = Config()
 hubert_model = None
 rmvpe_model = None
-
 
 def load_hubert():
     global hubert_model
@@ -72,7 +73,7 @@ def load_hubert():
     return hubert_model.eval()
 
 
-def get_all_paths(relative_directory):
+def get_all_paths(relative_directory, filetype=None):
     folders = []
     files = []
 
@@ -80,7 +81,8 @@ def get_all_paths(relative_directory):
         for dirname in dirnames:
             folders.append(os.path.relpath(os.path.join(dirpath, dirname), relative_directory))
         for filename in filenames:
-            files.append(os.path.relpath(os.path.join(dirpath, filename), relative_directory))
+            if filetype is None or filename.endswith(filetype):
+                files.append(os.path.relpath(os.path.join(dirpath, filename), relative_directory))
 
     return folders, files
 
@@ -135,6 +137,12 @@ def history_modifier(history):
 def output_modifier(string, state):
     if not params['activate']:
         return string
+    
+    if params['speaker'] is None:
+        return logger.error('No speaker selected')
+    
+    if params['rvc'] and params['rvc_model'] is None:
+        return logger.error('No RVC model selected')
 
     original_string = string
 
@@ -152,7 +160,7 @@ def output_modifier(string, state):
         # print(f'{string}')
 
         communicate = edge_tts.Communicate(string, params['speaker'])
-        asyncio.run(communicate.save(output_file))
+        # asyncio.run(communicate.save(output_file))
 
         if (params['rvc'] is True):
             print('Running RVC')
@@ -168,12 +176,6 @@ def output_modifier(string, state):
     return string
 
 
-def get_voices():
-    voices = asyncio.run(edge_tts.list_voices())
-    names = [x['ShortName'] for x in voices]
-    return names
-
-
 def random_sentence():
     with open(Path("extensions/edge_tts/harvard_sentences.txt")) as f:
         return random.choice(list(f))
@@ -181,6 +183,12 @@ def random_sentence():
 
 def voice_preview(preview_text):    
     global params
+
+    if params['speaker'] is None:
+        return logger.error('No speaker selected')
+    
+    if params['rvc'] and params['rvc_model'] is None:
+        return logger.error('No RVC model selected')
 
     string = preview_text or random_sentence()
 
@@ -196,16 +204,32 @@ def voice_preview(preview_text):
     return f'<audio src="file/{output_file.as_posix()}?{int(time.time())}" controls autoplay></audio>'
 
 
-def setup():
-    global voices, current_params, rvc_models, rmvpe_model, hubert_model
-    
+def refresh(x): 
+    global voices, current_params
+
     for i in params:
         if params[i] != current_params[i]:
             current_params = params.copy()
             break
-    voices = get_voices()
-    folders, files = get_all_paths('extensions/edge_tts/rvc_models')
+
+    # Get Voices
+    voices = asyncio.run(edge_tts.list_voices())
+    print(f"Loaded {len(voices)} voices.")
+    voices = [x['ShortName'] for x in voices]
+    
+    # Get RVC Models
+    folders, files = get_all_paths('extensions/edge_tts/rvc_models', '.pth')
     rvc_models = files
+    print(f"Found {len(rvc_models)} rvc models.")
+
+    if params['speaker'] not in voices:
+        params['speaker'] = 'en-US-MichelleNeural'
+
+    return [gr.update(value=params['speaker'], choices=voices), gr.update(value=params['rvc_model'], choices=rvc_models)]
+
+
+def setup():
+    global voices, current_params, rvc_models, rmvpe_model, hubert_model
 
     print("Loading hubert model...")
     hubert_model = load_hubert()
@@ -215,15 +239,22 @@ def setup():
     rmvpe_model = RMVPE("extensions/edge_tts/models/rmvpe.pt", rvc_config.is_half, rvc_config.device)
     print("rmvpe model loaded.")
 
+    # Cannot run async on main gradio thread
+    # This works, but does not refresh gradio
+    thread = Thread(target=refresh, args=(None,))
+    thread.start()
+
+
 def ui():
     # Gradio elements
     with gr.Accordion("Edge TTS"):
         with gr.Row():
             activate = gr.Checkbox(value=params['activate'], label='Activate TTS')
             autoplay = gr.Checkbox(value=params['autoplay'], label='Play TTS automatically')
+            refresh_button = gr.Button("Load Voices")
 
         show_text = gr.Checkbox(value=params['show_text'], label='Show message text under audio player')
-        voice = gr.Dropdown(value=params['speaker'], choices=voices, label='TTS voice')
+        voice_dropdown = gr.Dropdown(value=params['speaker'], choices=voices, label='TTS voice')
 
         with gr.Row():
             rvc = gr.Checkbox(value=params['rvc'], label='Use RVC')
@@ -250,7 +281,7 @@ def ui():
     # Event functions to update the parameters in the backend
     activate.change(lambda x: params.update({"activate": x}), activate, None)
     autoplay.change(lambda x: params.update({"autoplay": x}), autoplay, None)
-    voice.change(lambda x: params.update({"speaker": x}), voice, None)
+    voice_dropdown.change(lambda x: params.update({"speaker": x}), voice_dropdown, None)
     rvc.change(lambda x: params.update({"rvc": x}), rvc, None)
     model_dropdown.change(lambda x: params.update({"rvc_model": x}), model_dropdown, None)
     transpose.change(lambda x: params.update({"transpose": x}), transpose, None)
@@ -260,6 +291,9 @@ def ui():
     # Play preview
     preview_text.submit(voice_preview, preview_text, preview_audio)
     preview_play.click(voice_preview, preview_text, preview_audio)
+
+    # Refresh voices
+    refresh_button.click(refresh, refresh_button, [voice_dropdown, model_dropdown])
 
 # RVC functions, retrieved via https://github.com/litagin02/rvc-tts-webui
 
