@@ -1,17 +1,17 @@
-import math, pdb, os
-from time import time as ttime
+import math
+import logging
+
+logger = logging.getLogger(__name__)
+
+import numpy as np
 import torch
 from torch import nn
+from torch.nn import AvgPool1d, Conv1d, Conv2d, ConvTranspose1d
 from torch.nn import functional as F
-from lib.infer_pack import modules
-from lib.infer_pack import attentions
-from lib.infer_pack import commons
-from lib.infer_pack.commons import init_weights, get_padding
-from torch.nn import Conv1d, ConvTranspose1d, AvgPool1d, Conv2d
-from torch.nn.utils import weight_norm, remove_weight_norm, spectral_norm
-from lib.infer_pack.commons import init_weights
-import numpy as np
-from lib.infer_pack import commons
+from torch.nn.utils import remove_weight_norm, spectral_norm, weight_norm
+
+from lib.infer_pack import attentions, commons, modules
+from lib.infer_pack.commons import get_padding, init_weights
 
 
 class TextEncoder256(nn.Module):
@@ -551,7 +551,7 @@ class SynthesizerTrnMsNSFsidM(nn.Module):
         gin_channels,
         sr,
         version,
-        **kwargs
+        **kwargs,
     ):
         super().__init__()
         if type(sr) == type("strr"):
@@ -620,7 +620,9 @@ class SynthesizerTrnMsNSFsidM(nn.Module):
         )
         self.emb_g = nn.Embedding(self.spk_embed_dim, gin_channels)
         self.speaker_map = None
-        print("gin_channels:", gin_channels, "self.spk_embed_dim:", self.spk_embed_dim)
+        logger.debug(
+            f"gin_channels: {gin_channels}, self.spk_embed_dim: {self.spk_embed_dim}"
+        )
 
     def remove_weight_norm(self):
         self.dec.remove_weight_norm()
