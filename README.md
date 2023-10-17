@@ -1,6 +1,8 @@
 # text-generation-webui-edge-tts
 A simple extension for the [text-generation-webui by oobabooga](https://github.com/oobabooga/text-generation-webui) that uses [edge_tts](https://github.com/rany2/edge-tts) for audio output. It also supports post-processing using [RVC](https://github.com/RVC-Project/Retrieval-based-Voice-Conversion-WebUI).
 
+![text-generation-webui-edge-tts](/image.jpg)
+
 ## How to install
 Assuming you already have the text-generation-webui set up (min version [1.6.1](https://github.com/oobabooga/text-generation-webui/releases/tag/1.6.1)):
 
