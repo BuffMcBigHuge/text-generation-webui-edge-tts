@@ -4,7 +4,7 @@ omegaconf
 pydub
 PyYAML
 edge-tts
-fairseq==0.12.2
+fairseq @ git+https://github.com/liyaodev/fairseq.git
 faiss_cpu==1.7.4
 librosa==0.9.1
 praat-parselmouth==0.4.3
